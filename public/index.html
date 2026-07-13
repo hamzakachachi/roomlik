@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Create private, password-protected video rooms for two people.">
+  <meta name="theme-color" content="#14231f">
+  <title>Roomly — private calls for two</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg class="svg-definitions" aria-hidden="true">
+    <symbol id="icon-video" viewBox="0 0 24 24"><path d="M15 10.5V6.8c0-1-.8-1.8-1.8-1.8H5.8C4.8 5 4 5.8 4 6.8v10.4c0 1 .8 1.8 1.8 1.8h7.4c1 0 1.8-.8 1.8-1.8v-3.7l4 3V7.5l-4 3Z"/></symbol>
+    <symbol id="icon-lock" viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Zm4 4v2"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24"><path d="M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1m6.5-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7-1a2.5 2.5 0 0 1 0 5m4.5 5v-1a4 4 0 0 0-3-3.9"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l3.5-.8L19 7.7a1.4 1.4 0 0 0 0-2L18.3 5a1.4 1.4 0 0 0-2 0L4.8 16.5 4 20Z"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0m-7 7v3m-4 0h8"/></symbol>
+    <symbol id="icon-mic-off" viewBox="0 0 24 24"><path d="m4 4 16 16M9 9v2a3 3 0 0 0 4.7 2.5M15 9V6a3 3 0 0 0-5.1-2.1M5 11a7 7 0 0 0 11.7 5.2M19 11a7 7 0 0 1-.5 2.6M12 18v3m-4 0h8"/></symbol>
+    <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M15 10.5V6.8c0-1-.8-1.8-1.8-1.8H5.8C4.8 5 4 5.8 4 6.8v10.4c0 1 .8 1.8 1.8 1.8h7.4c1 0 1.8-.8 1.8-1.8v-3.7l4 3V7.5l-4 3Z"/></symbol>
+    <symbol id="icon-camera-off" viewBox="0 0 24 24"><path d="m4 4 16 16M15 11.2V6.8c0-1-.8-1.8-1.8-1.8H8.8M5 5.8c-.6.3-1 1-1 1.7v9.7c0 1 .8 1.8 1.8 1.8h7.4c.8 0 1.5-.5 1.7-1.2M15 10.5l4-3v9l-4-3"/></symbol>
+    <symbol id="icon-phone" viewBox="0 0 24 24"><path d="M5 14c4.5-3.2 9.5-3.2 14 0l-2 4-3-1.5v-2a12 12 0 0 0-4 0v2L7 18l-2-4Z"/></symbol>
+    <symbol id="icon-expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5c0 4.8 3.2 8.4 7.5 10 4.3-1.6 7.5-5.2 7.5-10V6L12 3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  </svg>
+
+  <div id="dashboard-view">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Roomly home">
+        <span class="brand-mark"><svg><use href="#icon-video"></use></svg></span>
+        <span>Roomly</span>
+      </a>
+      <div class="header-note"><span class="status-dot"></span> Peer-to-peer, by default</div>
+      <button class="button button-dark button-small" type="button" data-scroll-create>
+        <svg><use href="#icon-plus"></use></svg> New room
+      </button>
+    </header>
+
+    <main>
+      <section class="hero page-width">
+        <div class="hero-copy">
+          <div class="eyebrow"><svg><use href="#icon-shield"></use></svg> Private by design</div>
+          <h1>A quiet room for <em>just the two of you.</em></h1>
+          <p>Create a protected video room, share the link and meet face-to-face. No accounts, no crowded calls, no fuss.</p>
+          <div class="hero-actions">
+            <button class="button button-primary" type="button" data-scroll-create>Create a room <svg><use href="#icon-arrow"></use></svg></button>
+            <a class="text-link" href="#rooms">Browse your rooms</a>
+          </div>
+          <div class="trust-row">
+            <div><strong>2</strong><span>people max</span></div>
+            <div><strong>P2P</strong><span>encrypted media</span></div>
+            <div><strong>0</strong><span>accounts needed</span></div>
+          </div>
+        </div>
+
+        <aside class="create-card" id="create-room">
+          <div class="create-card-heading">
+            <span class="step-number">01</span>
+            <div><p class="overline">Start here</p><h2>Create a private room</h2></div>
+          </div>
+          <form id="create-form" novalidate>
+            <label class="field">
+              <span>Room name</span>
+              <input id="create-name" name="name" maxlength="60" placeholder="Friday catch-up" autocomplete="off" required>
+              <small class="field-error" data-error-for="name"></small>
+            </label>
+            <label class="field">
+              <span>Short description <i>optional</i></span>
+              <textarea id="create-description" name="description" maxlength="180" rows="3" placeholder="A place for our weekly chat"></textarea>
+              <small class="field-error" data-error-for="description"></small>
+            </label>
+            <label class="field">
+              <span>Room password</span>
+              <span class="password-wrap">
+                <input id="create-password" name="password" type="password" minlength="4" maxlength="72" placeholder="At least 4 characters" autocomplete="new-password" required>
+                <button type="button" class="password-toggle" data-toggle-password="create-password">Show</button>
+              </span>
+              <small class="field-error" data-error-for="password"></small>
+            </label>
+            <button class="button button-primary button-wide" type="submit">Create my room <svg><use href="#icon-arrow"></use></svg></button>
+            <p class="form-footnote"><svg><use href="#icon-lock"></use></svg> The password is securely hashed before storage.</p>
+          </form>
+        </aside>
+      </section>
+
+      <section class="rooms-section" id="rooms">
+        <div class="page-width">
+          <div class="section-heading">
+            <div><p class="overline">Your spaces</p><h2>Ready when you are</h2></div>
+            <label class="search-box">
+              <svg><use href="#icon-search"></use></svg>
+              <input id="room-search" type="search" placeholder="Find a room" aria-label="Find a room">
+            </label>
+          </div>
+          <div id="room-grid" class="room-grid" aria-live="polite"></div>
+          <div id="empty-state" class="empty-state" hidden>
+            <span class="empty-icon"><svg><use href="#icon-video"></use></svg></span>
+            <h3>No rooms here yet</h3>
+            <p>Create your first private space above. It only takes a few seconds.</p>
+            <button class="button button-dark" type="button" data-scroll-create>Create a room</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer page-width">
+      <a class="brand footer-brand" href="/"><span class="brand-mark"><svg><use href="#icon-video"></use></svg></span><span>Roomly</span></a>
+      <p>Simple, private video calls for two.</p>
+      <p>WebRTC · Password protected</p>
+    </footer>
+  </div>
+
+  <section id="call-view" class="call-view" hidden aria-label="Video call">
+    <header class="call-header">
+      <div class="call-brand-group">
+        <span class="brand-mark brand-mark-light"><svg><use href="#icon-video"></use></svg></span>
+        <div><p id="call-room-name">Room</p><span><i class="live-dot"></i><span id="call-status">Preparing your camera…</span></span></div>
+      </div>
+      <div class="call-header-actions">
+        <span id="call-timer" class="call-timer">00:00</span>
+        <button id="copy-call-link" class="call-text-button" type="button"><svg><use href="#icon-copy"></use></svg> Copy invite</button>
+      </div>
+    </header>
+
+    <div class="video-stage" id="video-stage">
+      <video id="remote-video" autoplay playsinline></video>
+      <div id="remote-placeholder" class="remote-placeholder">
+        <div class="waiting-orbit"><span></span><svg><use href="#icon-users"></use></svg></div>
+        <h2>Waiting for your person</h2>
+        <p>Share the room link and password. The call begins when they join.</p>
+        <button id="copy-waiting-link" class="button button-light" type="button"><svg><use href="#icon-copy"></use></svg> Copy invite link</button>
+      </div>
+
+      <div class="stage-topline">
+        <span class="security-pill"><svg><use href="#icon-lock"></use></svg> Peer-to-peer media</span>
+        <span class="people-pill"><svg><use href="#icon-users"></use></svg><span id="participant-count">1 / 2</span></span>
+      </div>
+
+      <div class="local-tile">
+        <video id="local-video" autoplay muted playsinline></video>
+        <span>You</span>
+        <div id="local-camera-off" class="camera-off-badge" hidden><svg><use href="#icon-camera-off"></use></svg></div>
+      </div>
+
+      <div class="call-controls" aria-label="Call controls">
+        <button id="toggle-mic" class="control-button" type="button" aria-label="Mute microphone" data-tooltip="Mute">
+          <svg class="icon-on"><use href="#icon-mic"></use></svg><svg class="icon-off"><use href="#icon-mic-off"></use></svg>
+        </button>
+        <button id="toggle-camera" class="control-button" type="button" aria-label="Turn camera off" data-tooltip="Camera">
+          <svg class="icon-on"><use href="#icon-camera"></use></svg><svg class="icon-off"><use href="#icon-camera-off"></use></svg>
+        </button>
+        <button id="leave-call" class="control-button control-button-danger" type="button" aria-label="Leave call" data-tooltip="Leave">
+          <svg><use href="#icon-phone"></use></svg>
+        </button>
+        <button id="fullscreen-call" class="control-button" type="button" aria-label="Open fullscreen" data-tooltip="Fullscreen">
+          <svg><use href="#icon-expand"></use></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="access-dialog" class="modal">
+    <form id="access-form" class="modal-card" method="dialog" novalidate>
+      <button class="modal-close" type="button" data-close-dialog aria-label="Close"><svg><use href="#icon-x"></use></svg></button>
+      <span class="modal-icon"><svg><use href="#icon-lock"></use></svg></span>
+      <p class="overline">Private room</p>
+      <h2 id="access-title">Unlock this room</h2>
+      <p id="access-copy" class="modal-copy">Enter the room password to continue.</p>
+      <input id="access-room-id" type="hidden">
+      <label class="field">
+        <span>Password</span>
+        <span class="password-wrap">
+          <input id="access-password" type="password" maxlength="72" placeholder="Enter room password" autocomplete="current-password" required>
+          <button type="button" class="password-toggle" data-toggle-password="access-password">Show</button>
+        </span>
+        <small id="access-error" class="field-error"></small>
+      </label>
+      <button class="button button-primary button-wide" type="submit">Unlock &amp; continue <svg><use href="#icon-arrow"></use></svg></button>
+    </form>
+  </dialog>
+
+  <dialog id="edit-dialog" class="modal">
+    <form id="edit-form" class="modal-card" method="dialog" novalidate>
+      <button class="modal-close" type="button" data-close-dialog aria-label="Close"><svg><use href="#icon-x"></use></svg></button>
+      <span class="modal-icon modal-icon-dark"><svg><use href="#icon-edit"></use></svg></span>
+      <p class="overline">Room settings</p>
+      <h2>Edit your room</h2>
+      <p class="modal-copy">Update the details people see before they join.</p>
+      <input id="edit-room-id" type="hidden">
+      <label class="field"><span>Room name</span><input id="edit-name" maxlength="60" required><small class="field-error" data-edit-error-for="name"></small></label>
+      <label class="field"><span>Description <i>optional</i></span><textarea id="edit-description" maxlength="180" rows="3"></textarea><small class="field-error" data-edit-error-for="description"></small></label>
+      <label class="field"><span>New password <i>leave blank to keep it</i></span><span class="password-wrap"><input id="edit-password" type="password" maxlength="72" placeholder="At least 4 characters" autocomplete="new-password"><button type="button" class="password-toggle" data-toggle-password="edit-password">Show</button></span><small class="field-error" data-edit-error-for="password"></small></label>
+      <button class="button button-primary button-wide" type="submit">Save changes</button>
+    </form>
+  </dialog>
+
+  <dialog id="delete-dialog" class="modal">
+    <form id="delete-form" class="modal-card modal-card-compact" method="dialog">
+      <button class="modal-close" type="button" data-close-dialog aria-label="Close"><svg><use href="#icon-x"></use></svg></button>
+      <span class="modal-icon modal-icon-danger"><svg><use href="#icon-trash"></use></svg></span>
+      <p class="overline">Delete room</p>
+      <h2>Remove “<span id="delete-room-name"></span>”?</h2>
+      <p class="modal-copy">This permanently removes the room and ends any active call inside it.</p>
+      <input id="delete-room-id" type="hidden">
+      <div class="modal-actions"><button class="button button-secondary" type="button" data-close-dialog>Keep room</button><button class="button button-danger" type="submit">Delete room</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
