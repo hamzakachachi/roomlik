@@ -334,8 +334,6 @@ function cameraVideoConstraints() {
     return {
       width: { ideal: 720 },
       height: { ideal: 1280 },
-      aspectRatio: { ideal: 9 / 16 },
-      resizeMode: { ideal: 'crop-and-scale' },
       facingMode: 'user',
     };
   }
@@ -353,7 +351,10 @@ async function adaptCameraToOrientation() {
   if (!videoTrack?.applyConstraints) return;
 
   try {
-    await videoTrack.applyConstraints(cameraVideoConstraints());
+    const constraints = cameraVideoConstraints();
+    const zoomMinimum = videoTrack.getCapabilities?.().zoom?.min;
+    if (Number.isFinite(zoomMinimum)) constraints.advanced = [{ zoom: zoomMinimum }];
+    await videoTrack.applyConstraints(constraints);
   } catch {
     // Some mobile cameras expose only one capture shape; CSS still adapts it.
   }
@@ -398,7 +399,7 @@ function updateAdaptiveVideoLayout({ adaptCamera = true } = {}) {
     : null;
 
   if (phoneViewport) {
-    elements.remoteVideo.classList.remove('fit-contain');
+    elements.remoteVideo.classList.add('fit-contain');
   } else if (remoteAspect && stageAspect) {
     const aspectMismatch = Math.max(remoteAspect / stageAspect, stageAspect / remoteAspect);
     const compactDevice = Math.min(viewport.width, viewport.height) < 760;
@@ -702,6 +703,7 @@ async function openCall(room, token) {
       video: cameraVideoConstraints(),
       audio: { echoCancellation: true, noiseSuppression: true },
     });
+    await adaptCameraToOrientation();
     elements.localVideo.srcObject = state.localStream;
     window.requestAnimationFrame(() => updateAdaptiveVideoLayout({ adaptCamera: false }));
   } catch (error) {
