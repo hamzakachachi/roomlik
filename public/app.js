@@ -9,6 +9,7 @@ const state = {
   timer: null,
   startedAt: null,
   inviteHandled: false,
+  deviceOrientation: null,
 };
 
 const rtcConfiguration = {
@@ -270,22 +271,122 @@ function getOverlayPosition(element) {
   };
 }
 
-function placeOverlay(element, left, top) {
-  const maximumLeft = Math.max(OVERLAY_MARGIN, elements.videoStage.clientWidth - element.offsetWidth - OVERLAY_MARGIN);
-  const maximumTop = Math.max(OVERLAY_MARGIN, elements.videoStage.clientHeight - element.offsetHeight - OVERLAY_MARGIN);
+function getOverlayBounds(element) {
+  return {
+    maximumLeft: Math.max(OVERLAY_MARGIN, elements.videoStage.clientWidth - element.offsetWidth - OVERLAY_MARGIN),
+    maximumTop: Math.max(OVERLAY_MARGIN, elements.videoStage.clientHeight - element.offsetHeight - OVERLAY_MARGIN),
+  };
+}
 
-  element.style.left = `${clamp(left, OVERLAY_MARGIN, maximumLeft)}px`;
-  element.style.top = `${clamp(top, OVERLAY_MARGIN, maximumTop)}px`;
+function placeOverlay(element, left, top) {
+  const { maximumLeft, maximumTop } = getOverlayBounds(element);
+  const nextLeft = clamp(left, OVERLAY_MARGIN, maximumLeft);
+  const nextTop = clamp(top, OVERLAY_MARGIN, maximumTop);
+
+  element.style.left = `${nextLeft}px`;
+  element.style.top = `${nextTop}px`;
   element.style.right = 'auto';
   element.style.bottom = 'auto';
   element.style.translate = 'none';
   element.dataset.moved = 'true';
+  element.dataset.positionX = String(maximumLeft === OVERLAY_MARGIN ? 0 : (nextLeft - OVERLAY_MARGIN) / (maximumLeft - OVERLAY_MARGIN));
+  element.dataset.positionY = String(maximumTop === OVERLAY_MARGIN ? 0 : (nextTop - OVERLAY_MARGIN) / (maximumTop - OVERLAY_MARGIN));
 }
 
 function clampMovedOverlay(element) {
   if (element.hidden || element.dataset.moved !== 'true') return;
+  const { maximumLeft, maximumTop } = getOverlayBounds(element);
+  const horizontalRatio = Number(element.dataset.positionX);
+  const verticalRatio = Number(element.dataset.positionY);
+
+  if (Number.isFinite(horizontalRatio) && Number.isFinite(verticalRatio)) {
+    placeOverlay(
+      element,
+      OVERLAY_MARGIN + horizontalRatio * (maximumLeft - OVERLAY_MARGIN),
+      OVERLAY_MARGIN + verticalRatio * (maximumTop - OVERLAY_MARGIN),
+    );
+    return;
+  }
+
   const position = getOverlayPosition(element);
   placeOverlay(element, position.left, position.top);
+}
+
+function viewportDimensions() {
+  return {
+    width: window.visualViewport?.width || window.innerWidth,
+    height: window.visualViewport?.height || window.innerHeight,
+  };
+}
+
+function deviceOrientation() {
+  const viewport = viewportDimensions();
+  return viewport.height >= viewport.width ? 'portrait' : 'landscape';
+}
+
+function cameraVideoConstraints() {
+  const portrait = deviceOrientation() === 'portrait';
+  return {
+    width: { ideal: portrait ? 720 : 1280 },
+    height: { ideal: portrait ? 1280 : 720 },
+    facingMode: 'user',
+  };
+}
+
+async function adaptCameraToOrientation() {
+  const videoTrack = state.localStream?.getVideoTracks()[0];
+  if (!videoTrack?.applyConstraints) return;
+
+  try {
+    await videoTrack.applyConstraints(cameraVideoConstraints());
+  } catch {
+    // Some mobile cameras expose only one capture shape; CSS still adapts it.
+  }
+}
+
+function mediaAspect(video, fallbackTrack) {
+  const settings = fallbackTrack?.getSettings?.() || {};
+  const width = video.videoWidth || settings.width || 0;
+  const height = video.videoHeight || settings.height || 0;
+  return width > 0 && height > 0 ? width / height : null;
+}
+
+function updateAdaptiveVideoLayout({ adaptCamera = true } = {}) {
+  const viewport = viewportDimensions();
+  const orientation = deviceOrientation();
+  const orientationChanged = state.deviceOrientation && state.deviceOrientation !== orientation;
+  state.deviceOrientation = orientation;
+
+  elements.callView.style.setProperty('--call-height', `${Math.round(viewport.height)}px`);
+  elements.callView.classList.toggle('is-portrait', orientation === 'portrait');
+  elements.callView.classList.toggle('is-landscape', orientation === 'landscape');
+
+  if (orientationChanged && adaptCamera && state.localStream) adaptCameraToOrientation();
+
+  const localTrack = state.localStream?.getVideoTracks()[0];
+  const localAspect = mediaAspect(elements.localVideo, localTrack);
+  if (localAspect) {
+    const safeLocalAspect = clamp(localAspect, 0.72, 1.85);
+    elements.localTile.style.setProperty('--local-aspect', String(safeLocalAspect));
+    elements.localTile.classList.toggle('is-portrait-video', localAspect < 0.95);
+  }
+
+  const remoteTrack = elements.remoteVideo.srcObject?.getVideoTracks?.()[0];
+  const remoteAspect = mediaAspect(elements.remoteVideo, remoteTrack);
+  const stageAspect = elements.videoStage.clientHeight > 0
+    ? elements.videoStage.clientWidth / elements.videoStage.clientHeight
+    : null;
+
+  if (remoteAspect && stageAspect) {
+    const aspectMismatch = Math.max(remoteAspect / stageAspect, stageAspect / remoteAspect);
+    const compactDevice = Math.min(viewport.width, viewport.height) < 760;
+    elements.remoteVideo.classList.toggle('fit-contain', aspectMismatch > (compactDevice ? 1.28 : 1.55));
+  } else {
+    elements.remoteVideo.classList.remove('fit-contain');
+  }
+
+  clampMovedOverlay(elements.localTile);
+  clampMovedOverlay(elements.callControls);
 }
 
 function makeDraggable(element, { pointerHandle = element, keyboardHandle = pointerHandle, ignoreSelector = '' } = {}) {
@@ -358,11 +459,15 @@ function resetCallOverlays() {
     element.style.removeProperty('translate');
     element.classList.remove('is-dragging');
     delete element.dataset.moved;
+    delete element.dataset.positionX;
+    delete element.dataset.positionY;
   });
 
   elements.localTile.hidden = false;
   elements.showLocalPreview.hidden = true;
   elements.callControls.classList.remove('is-collapsed');
+  elements.localTile.classList.remove('is-portrait-video');
+  elements.localTile.style.removeProperty('--local-aspect');
   const collapseButton = document.querySelector('#collapse-toolbar');
   collapseButton.setAttribute('aria-expanded', 'true');
   collapseButton.setAttribute('aria-label', 'Collapse toolbar');
@@ -559,6 +664,7 @@ async function openCall(room, token) {
   elements.dashboard.hidden = true;
   elements.callView.hidden = false;
   resetCallOverlays();
+  updateAdaptiveVideoLayout({ adaptCamera: false });
   document.querySelector('#call-room-name').textContent = room.name;
   document.querySelector('#call-status').textContent = 'Preparing your camera…';
   document.querySelector('#participant-count').textContent = '1 / 2';
@@ -571,10 +677,11 @@ async function openCall(room, token) {
       throw new Error('Camera access requires HTTPS or localhost.');
     }
     state.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      video: cameraVideoConstraints(),
       audio: { echoCancellation: true, noiseSuppression: true },
     });
     elements.localVideo.srcObject = state.localStream;
+    window.requestAnimationFrame(() => updateAdaptiveVideoLayout({ adaptCamera: false }));
   } catch (error) {
     leaveCall({ updateHash: true });
     showToast(error.message || 'Camera and microphone permission is needed to join.', 'error');
@@ -615,6 +722,7 @@ async function openCall(room, token) {
   state.socket.on('peer-left', () => {
     closePeerConnection();
     elements.remoteVideo.srcObject = null;
+    elements.remoteVideo.classList.remove('fit-contain');
     elements.remotePlaceholder.hidden = false;
     document.querySelector('#call-status').textContent = 'Your guest left — waiting again';
     showToast('The other person left the room.');
@@ -642,6 +750,7 @@ function createPeerConnection() {
   connection.addEventListener('track', (event) => {
     elements.remoteVideo.srcObject = event.streams[0];
     elements.remotePlaceholder.hidden = true;
+    window.requestAnimationFrame(() => updateAdaptiveVideoLayout({ adaptCamera: false }));
   });
 
   connection.addEventListener('connectionstatechange', () => {
@@ -721,6 +830,7 @@ function leaveCall({ updateHash = true } = {}) {
   state.localStream = null;
   elements.localVideo.srcObject = null;
   elements.remoteVideo.srcObject = null;
+  elements.remoteVideo.classList.remove('fit-contain');
   window.clearInterval(state.timer);
   state.timer = null;
   state.currentRoom = null;
@@ -795,20 +905,31 @@ let resizeFrame;
 function keepOverlaysInView() {
   window.cancelAnimationFrame(resizeFrame);
   resizeFrame = window.requestAnimationFrame(() => {
-    clampMovedOverlay(elements.localTile);
-    clampMovedOverlay(elements.callControls);
+    updateAdaptiveVideoLayout();
   });
 }
 
 window.addEventListener('resize', keepOverlaysInView);
+window.addEventListener('orientationchange', keepOverlaysInView);
+window.visualViewport?.addEventListener('resize', keepOverlaysInView);
+window.screen.orientation?.addEventListener('change', keepOverlaysInView);
 document.addEventListener('fullscreenchange', keepOverlaysInView);
+elements.localVideo.addEventListener('loadedmetadata', () => updateAdaptiveVideoLayout({ adaptCamera: false }));
+elements.localVideo.addEventListener('resize', () => updateAdaptiveVideoLayout({ adaptCamera: false }));
+elements.remoteVideo.addEventListener('loadedmetadata', () => updateAdaptiveVideoLayout({ adaptCamera: false }));
+elements.remoteVideo.addEventListener('resize', () => updateAdaptiveVideoLayout({ adaptCamera: false }));
 
 document.querySelector('#leave-call').addEventListener('click', () => leaveCall({ updateHash: true }));
 document.querySelector('#copy-call-link').addEventListener('click', () => state.currentRoom && copyInvite(state.currentRoom.id));
 document.querySelector('#copy-waiting-link').addEventListener('click', () => state.currentRoom && copyInvite(state.currentRoom.id));
 document.querySelector('#fullscreen-call').addEventListener('click', async () => {
-  if (document.fullscreenElement) await document.exitFullscreen();
-  else await document.querySelector('#video-stage').requestFullscreen();
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (elements.videoStage.requestFullscreen) await elements.videoStage.requestFullscreen();
+    else if (elements.remoteVideo.webkitEnterFullscreen) elements.remoteVideo.webkitEnterFullscreen();
+  } catch {
+    showToast('Fullscreen is not available on this device.', 'error');
+  }
 });
 
 window.addEventListener('beforeunload', () => {
