@@ -318,7 +318,7 @@ h1 em { color: #426d5e; font-weight: 400; }
   .video-stage { border-radius: 16px; }
   .security-pill { display: none; }
   .stage-topline { justify-content: flex-end; top: 11px; right: 11px; }
-  .local-tile, .local-tile.is-portrait-video { width: clamp(112px, 34vw, 155px); min-width: 0; right: 11px; bottom: 78px; }
+  .local-tile, .local-tile.is-portrait-video { width: clamp(88px, 25vw, 112px); min-width: 0; aspect-ratio: 9 / 16; right: 11px; bottom: 78px; }
   .local-tile-actions { opacity: 1; }
   .show-local-preview { right: 11px; bottom: 82px; }
   .call-controls { bottom: 14px; gap: 5px; padding: 5px; }
@@ -332,6 +332,7 @@ h1 em { color: #426d5e; font-weight: 400; }
 
 @media (max-width: 680px) and (orientation: portrait) {
   .video-stage { border-radius: 14px; }
+  .call-view.is-phone .video-stage > video { object-fit: cover; }
   .remote-placeholder { padding-bottom: 56px; }
   .waiting-orbit { width: 76px; height: 76px; }
   .waiting-orbit::before { inset: -9px; }
@@ -352,7 +353,7 @@ h1 em { color: #426d5e; font-weight: 400; }
   .video-stage { border-radius: 13px; }
   .stage-topline { top: 9px; left: 9px; right: 9px; }
   .security-pill, .people-pill { min-height: 27px; padding-inline: 8px; }
-  .local-tile, .local-tile.is-portrait-video { width: clamp(108px, 22vw, 180px); right: 9px; bottom: 9px; }
+  .local-tile, .local-tile.is-portrait-video { width: clamp(76px, 12vw, 96px); aspect-ratio: 9 / 16; right: 9px; bottom: 9px; }
   .show-local-preview { right: 9px; bottom: 9px; }
   .call-controls { bottom: 9px; }
   .waiting-orbit { width: 54px; height: 54px; }
@@ -362,6 +363,19 @@ h1 em { color: #426d5e; font-weight: 400; }
   .remote-placeholder h2 { margin: 17px 0 5px; font-size: clamp(23px, 4vw, 32px); }
   .remote-placeholder p { margin-bottom: 13px; font-size: 11px; line-height: 1.4; }
   .remote-placeholder .button { min-height: 38px; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .call-view.is-phone .video-stage > video {
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: auto;
+    height: 100%;
+    aspect-ratio: 9 / 16;
+    object-fit: cover;
+    transform: translateX(-50%);
+    background: #090e0c;
+  }
 }
 
 @media (orientation: landscape) and (max-height: 420px) {

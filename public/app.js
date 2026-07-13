@@ -324,7 +324,22 @@ function deviceOrientation() {
   return viewport.height >= viewport.width ? 'portrait' : 'landscape';
 }
 
+function isPhoneViewport() {
+  const viewport = viewportDimensions();
+  return Math.min(viewport.width, viewport.height) < 680;
+}
+
 function cameraVideoConstraints() {
+  if (isPhoneViewport()) {
+    return {
+      width: { ideal: 720 },
+      height: { ideal: 1280 },
+      aspectRatio: { ideal: 9 / 16 },
+      resizeMode: { ideal: 'crop-and-scale' },
+      facingMode: 'user',
+    };
+  }
+
   const portrait = deviceOrientation() === 'portrait';
   return {
     width: { ideal: portrait ? 720 : 1280 },
@@ -354,18 +369,23 @@ function mediaAspect(video, fallbackTrack) {
 function updateAdaptiveVideoLayout({ adaptCamera = true } = {}) {
   const viewport = viewportDimensions();
   const orientation = deviceOrientation();
+  const phoneViewport = isPhoneViewport();
   const orientationChanged = state.deviceOrientation && state.deviceOrientation !== orientation;
   state.deviceOrientation = orientation;
 
   elements.callView.style.setProperty('--call-height', `${Math.round(viewport.height)}px`);
   elements.callView.classList.toggle('is-portrait', orientation === 'portrait');
   elements.callView.classList.toggle('is-landscape', orientation === 'landscape');
+  elements.callView.classList.toggle('is-phone', phoneViewport);
 
   if (orientationChanged && adaptCamera && state.localStream) adaptCameraToOrientation();
 
   const localTrack = state.localStream?.getVideoTracks()[0];
   const localAspect = mediaAspect(elements.localVideo, localTrack);
-  if (localAspect) {
+  if (phoneViewport) {
+    elements.localTile.style.setProperty('--local-aspect', String(9 / 16));
+    elements.localTile.classList.add('is-portrait-video');
+  } else if (localAspect) {
     const safeLocalAspect = clamp(localAspect, 0.72, 1.85);
     elements.localTile.style.setProperty('--local-aspect', String(safeLocalAspect));
     elements.localTile.classList.toggle('is-portrait-video', localAspect < 0.95);
@@ -377,7 +397,9 @@ function updateAdaptiveVideoLayout({ adaptCamera = true } = {}) {
     ? elements.videoStage.clientWidth / elements.videoStage.clientHeight
     : null;
 
-  if (remoteAspect && stageAspect) {
+  if (phoneViewport) {
+    elements.remoteVideo.classList.remove('fit-contain');
+  } else if (remoteAspect && stageAspect) {
     const aspectMismatch = Math.max(remoteAspect / stageAspect, stageAspect / remoteAspect);
     const compactDevice = Math.min(viewport.width, viewport.height) < 760;
     elements.remoteVideo.classList.toggle('fit-contain', aspectMismatch > (compactDevice ? 1.28 : 1.55));
