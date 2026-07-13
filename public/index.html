@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Create private, password-protected video rooms for two people.">
   <meta name="theme-color" content="#14231f">
-  <title>Roomly — private calls for two</title>
+  <title>Roomlik — private calls for two</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -28,13 +28,15 @@
     <symbol id="icon-expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5"/></symbol>
     <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5c0 4.8 3.2 8.4 7.5 10 4.3-1.6 7.5-5.2 7.5-10V6L12 3Z"/><path d="m9 12 2 2 4-4"/></symbol>
     <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="icon-grip" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1"/><circle cx="15" cy="7" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="17" r="1"/><circle cx="15" cy="17" r="1"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
   </svg>
 
   <div id="dashboard-view">
     <header class="site-header">
-      <a class="brand" href="/" aria-label="Roomly home">
+      <a class="brand" href="/" aria-label="Roomlik home">
         <span class="brand-mark"><svg><use href="#icon-video"></use></svg></span>
-        <span>Roomly</span>
+        <span>Roomlik</span>
       </a>
       <div class="header-note"><span class="status-dot"></span> Peer-to-peer, by default</div>
       <button class="button button-dark button-small" type="button" data-scroll-create>
@@ -110,8 +112,8 @@
     </main>
 
     <footer class="site-footer page-width">
-      <a class="brand footer-brand" href="/"><span class="brand-mark"><svg><use href="#icon-video"></use></svg></span><span>Roomly</span></a>
-      <p>Simple, private video calls for two.</p>
+      <a class="brand footer-brand" href="/"><span class="brand-mark"><svg><use href="#icon-video"></use></svg></span><span>Roomlik</span></a>
+      <p>Developed by Hamza Kachachi</p>
       <p>WebRTC · Password protected</p>
     </footer>
   </div>
@@ -142,24 +144,41 @@
         <span class="people-pill"><svg><use href="#icon-users"></use></svg><span id="participant-count">1 / 2</span></span>
       </div>
 
-      <div class="local-tile">
+      <div id="local-tile" class="local-tile" aria-label="Your movable self view">
         <video id="local-video" autoplay muted playsinline></video>
         <span>You</span>
         <div id="local-camera-off" class="camera-off-badge" hidden><svg><use href="#icon-camera-off"></use></svg></div>
+        <div class="local-tile-actions">
+          <button id="local-drag-handle" class="tile-action tile-drag-handle" type="button" aria-label="Move self view with arrow keys" title="Drag to move your self view">
+            <svg><use href="#icon-grip"></use></svg>
+          </button>
+          <button id="hide-local-preview" class="tile-action" type="button" aria-label="Hide self view" title="Hide self view" data-no-drag>
+            <svg><use href="#icon-x"></use></svg>
+          </button>
+        </div>
       </div>
+      <button id="show-local-preview" class="show-local-preview" type="button" hidden>
+        <svg><use href="#icon-video"></use></svg> Show self
+      </button>
 
-      <div class="call-controls" aria-label="Call controls">
-        <button id="toggle-mic" class="control-button" type="button" aria-label="Mute microphone" data-tooltip="Mute">
+      <div id="call-controls" class="call-controls" aria-label="Movable call controls">
+        <button id="toolbar-drag-handle" class="control-button toolbar-drag-handle" type="button" aria-label="Move toolbar with arrow keys" data-tooltip="Drag toolbar">
+          <svg><use href="#icon-grip"></use></svg>
+        </button>
+        <button id="toggle-mic" class="control-button toolbar-action" type="button" aria-label="Mute microphone" data-tooltip="Mute">
           <svg class="icon-on"><use href="#icon-mic"></use></svg><svg class="icon-off"><use href="#icon-mic-off"></use></svg>
         </button>
-        <button id="toggle-camera" class="control-button" type="button" aria-label="Turn camera off" data-tooltip="Camera">
+        <button id="toggle-camera" class="control-button toolbar-action" type="button" aria-label="Turn camera off" data-tooltip="Camera">
           <svg class="icon-on"><use href="#icon-camera"></use></svg><svg class="icon-off"><use href="#icon-camera-off"></use></svg>
         </button>
-        <button id="leave-call" class="control-button control-button-danger" type="button" aria-label="Leave call" data-tooltip="Leave">
+        <button id="leave-call" class="control-button control-button-danger toolbar-action" type="button" aria-label="Leave call" data-tooltip="Leave">
           <svg><use href="#icon-phone"></use></svg>
         </button>
-        <button id="fullscreen-call" class="control-button" type="button" aria-label="Open fullscreen" data-tooltip="Fullscreen">
+        <button id="fullscreen-call" class="control-button toolbar-action" type="button" aria-label="Open fullscreen" data-tooltip="Fullscreen">
           <svg><use href="#icon-expand"></use></svg>
+        </button>
+        <button id="collapse-toolbar" class="control-button toolbar-toggle" type="button" aria-label="Collapse toolbar" aria-expanded="true" data-tooltip="Collapse">
+          <svg><use href="#icon-chevron"></use></svg>
         </button>
       </div>
     </div>

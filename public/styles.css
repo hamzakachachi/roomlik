@@ -225,12 +225,27 @@ h1 em { color: #426d5e; font-weight: 400; }
 .stage-topline { position: absolute; z-index: 3; left: 18px; right: 18px; top: 18px; display: flex; justify-content: space-between; pointer-events: none; }
 .security-pill, .people-pill { min-height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; color: #cbd4d0; background: rgba(7,14,11,.54); backdrop-filter: blur(10px); font-size: 10px; font-weight: 680; }
 .security-pill svg, .people-pill svg { width: 13px; height: 13px; color: var(--mint); }
-.local-tile { position: absolute; z-index: 4; right: 18px; bottom: 18px; width: min(23vw, 270px); aspect-ratio: 16 / 10; border: 2px solid rgba(255,255,255,.2); border-radius: 15px; background: #25352f; box-shadow: 0 14px 38px rgba(0,0,0,.3); overflow: hidden; }
-.local-tile video { width: 100%; height: 100%; display: block; object-fit: cover; transform: scaleX(-1); }
-.local-tile > span { position: absolute; left: 9px; bottom: 8px; padding: 4px 7px; border-radius: 6px; background: rgba(0,0,0,.48); font-size: 9px; font-weight: 700; }
-.camera-off-badge { position: absolute; inset: 0; display: grid; place-items: center; color: #b4c0bb; background: #2a3b35; }
+.local-tile { position: absolute; z-index: 4; right: 18px; bottom: 18px; width: min(23vw, 270px); aspect-ratio: 16 / 10; border: 2px solid rgba(255,255,255,.2); border-radius: 15px; background: #25352f; box-shadow: 0 14px 38px rgba(0,0,0,.3); cursor: grab; touch-action: none; user-select: none; overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; }
+.local-tile:hover { border-color: rgba(255,255,255,.38); box-shadow: 0 18px 48px rgba(0,0,0,.38); }
+.local-tile.is-dragging { cursor: grabbing; border-color: rgba(185,239,131,.75); box-shadow: 0 21px 55px rgba(0,0,0,.48); }
+.local-tile video { width: 100%; height: 100%; display: block; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+.local-tile > span { position: absolute; z-index: 2; left: 9px; bottom: 8px; padding: 4px 7px; border-radius: 6px; background: rgba(0,0,0,.48); font-size: 9px; font-weight: 700; pointer-events: none; }
+.camera-off-badge { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; color: #b4c0bb; background: #2a3b35; pointer-events: none; }
 .camera-off-badge svg { width: 26px; height: 26px; }
-.call-controls { position: absolute; z-index: 5; left: 50%; bottom: 21px; translate: -50% 0; display: flex; gap: 10px; padding: 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: rgba(7,15,12,.68); backdrop-filter: blur(13px); }
+.local-tile-actions { position: absolute; z-index: 3; top: 7px; right: 7px; display: flex; gap: 4px; opacity: 0; transition: opacity .16s ease; }
+.local-tile:hover .local-tile-actions, .local-tile:focus-within .local-tile-actions, .local-tile.is-dragging .local-tile-actions { opacity: 1; }
+.tile-action { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 8px; color: white; background: rgba(5,12,9,.68); backdrop-filter: blur(9px); }
+.tile-action:hover { background: rgba(5,12,9,.9); }
+.tile-action svg { width: 14px; height: 14px; }
+.tile-drag-handle { cursor: grab; }
+.show-local-preview { position: absolute; z-index: 4; right: 18px; bottom: 18px; min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 13px; border: 1px solid rgba(255,255,255,.14); border-radius: 11px; color: white; background: rgba(7,15,12,.7); backdrop-filter: blur(11px); font-size: 10px; font-weight: 720; }
+.show-local-preview:hover { background: rgba(28,48,42,.94); }
+.show-local-preview svg { width: 15px; height: 15px; }
+.call-controls { position: absolute; z-index: 5; left: 50%; bottom: 21px; translate: -50% 0; display: flex; gap: 8px; padding: 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: rgba(7,15,12,.68); backdrop-filter: blur(13px); touch-action: none; user-select: none; transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.call-controls.is-dragging { border-color: rgba(185,239,131,.58); box-shadow: 0 14px 35px rgba(0,0,0,.32); }
+.call-controls.is-collapsed { gap: 3px; padding: 5px; border-radius: 13px; }
+.call-controls.is-collapsed .toolbar-action { display: none; }
+.call-controls.is-collapsed .toolbar-toggle svg { transform: rotate(180deg); }
 .control-button { position: relative; width: 47px; height: 47px; display: grid; place-items: center; border: 0; border-radius: 12px; color: white; background: rgba(255,255,255,.11); }
 .control-button:hover { background: rgba(255,255,255,.2); }
 .control-button svg { width: 20px; height: 20px; }
@@ -240,6 +255,11 @@ h1 em { color: #426d5e; font-weight: 400; }
 .control-button.is-off .icon-off { display: block; }
 .control-button-danger { color: white; background: var(--danger); }
 .control-button-danger:hover { background: #ea675c; }
+.toolbar-drag-handle { width: 34px; cursor: grab; color: #a9b5b0; background: transparent; }
+.toolbar-drag-handle:active { cursor: grabbing; }
+.toolbar-drag-handle svg { width: 17px; height: 17px; }
+.toolbar-toggle { width: 38px; color: #aeb9b5; background: transparent; }
+.toolbar-toggle svg { width: 16px; height: 16px; transition: transform .18s ease; }
 .control-button::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 10px); left: 50%; translate: -50% 3px; padding: 5px 7px; border-radius: 5px; color: white; background: #07100d; font-size: 9px; opacity: 0; pointer-events: none; transition: opacity .15s, translate .15s; }
 .control-button:hover::after { opacity: 1; translate: -50% 0; }
 
@@ -292,8 +312,12 @@ h1 em { color: #426d5e; font-weight: 400; }
   .security-pill { display: none; }
   .stage-topline { justify-content: flex-end; top: 11px; right: 11px; }
   .local-tile { width: 36vw; min-width: 120px; right: 11px; bottom: 90px; }
-  .call-controls { bottom: 14px; }
-  .control-button { width: 45px; height: 45px; }
+  .local-tile-actions { opacity: 1; }
+  .show-local-preview { right: 11px; bottom: 82px; }
+  .call-controls { bottom: 14px; gap: 5px; padding: 5px; }
+  .control-button { width: 41px; height: 41px; }
+  .toolbar-drag-handle { width: 29px; }
+  .toolbar-toggle { width: 33px; }
   .remote-placeholder p { max-width: 330px; }
   .toast-region { left: 12px; right: 12px; bottom: 12px; }
   .toast { min-width: 0; max-width: none; }

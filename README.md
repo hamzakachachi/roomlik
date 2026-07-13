@@ -1,6 +1,8 @@
-# Roomly
+# Roomlik
 
-Roomly is a small full-stack Node.js app for private, two-person video calls. Rooms can be created, viewed, edited, and deleted; every room is protected by a hashed password.
+Roomlik is a small full-stack Node.js app for private, two-person video calls, developed by **Hamza Kachachi**. Rooms can be created, viewed, edited, and deleted; every room is protected by a hashed password.
+
+The public home page is protected by a discreet preview gate. Visitors see only **Coming soon**. Double-clicking those words opens the admin-password prompt. Direct room invite links bypass the preview gate but still require the room's own password.
 
 ## Run locally
 
@@ -29,6 +31,7 @@ Open [http://localhost:3000](http://localhost:3000). Camera access works on `loc
 | `PORT` | HTTP port | `3000` |
 | `DATA_FILE` | Room JSON storage path | `data/rooms.json` |
 | `TOKEN_SECRET` | Secret used to sign room access tokens | Random per server start |
+| `ADMIN_PASSWORD` | Static password for the Coming soon preview gate | `change-me-admin-password` |
 
 Set a stable, strong `TOKEN_SECRET` in production so access tokens remain valid across restarts. For reliable calls across strict corporate or mobile networks, add your own TURN server to `rtcConfiguration` in `public/app.js`.
 
@@ -48,15 +51,15 @@ cp .env.example .env
 openssl rand -hex 32
 ```
 
-Put the generated value after `TOKEN_SECRET=` in `.env`, then build and start the service:
+Put the generated value after `TOKEN_SECRET=` in `.env`, set a strong private value for `ADMIN_PASSWORD`, then build and start the service:
 
 ```bash
 docker compose up -d --build
 docker compose ps
-docker compose logs -f roomly
+docker compose logs -f roomlik
 ```
 
-The app is available on port `3000` by default. Change `APP_PORT` in `.env` if the VPS should publish a different port. Room records persist in the `roomly_data` named volume, including across container rebuilds.
+The app is available on port `3000` by default. Change `APP_PORT` in `.env` if the VPS should publish a different port. Room records persist in the `roomlik_data` named volume, including across container rebuilds.
 
 For a public VPS, place Caddy, Nginx, or another HTTPS reverse proxy in front of `localhost:3000`. Browsers require HTTPS for camera and microphone access outside `localhost`, and the proxy must pass WebSocket upgrade headers for Socket.IO.
 
@@ -73,7 +76,7 @@ docker compose ps
 docker compose down
 
 # Back up the persistent room database
-docker compose exec roomly cat /app/data/rooms.json > rooms-backup.json
+docker compose exec roomlik cat /app/data/rooms.json > rooms-backup.json
 ```
 
 Do not run `docker compose down -v` unless you intend to permanently delete all stored rooms.

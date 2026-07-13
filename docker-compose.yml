@@ -1,10 +1,10 @@
 services:
-  roomly:
+  roomlik:
     build:
       context: .
       dockerfile: Dockerfile
-    image: roomly:latest
-    container_name: roomly
+    image: roomlik:latest
+    container_name: roomlik
     init: true
     restart: unless-stopped
     ports:
@@ -14,8 +14,9 @@ services:
       PORT: 3000
       DATA_FILE: /app/data/rooms.json
       TOKEN_SECRET: "${TOKEN_SECRET:?Set TOKEN_SECRET in a .env file}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in a .env file}"
     volumes:
-      - roomly_data:/app/data
+      - roomlik_data:/app/data
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
@@ -24,7 +25,7 @@ services:
     cap_drop:
       - ALL
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/rooms"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -32,5 +33,5 @@ services:
     stop_grace_period: 10s
 
 volumes:
-  roomly_data:
-    name: roomly_data
+  roomlik_data:
+    name: roomlik_data

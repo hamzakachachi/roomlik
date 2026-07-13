@@ -15,6 +15,10 @@ const rtcConfiguration = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 };
 
+const invitePathMatch = window.location.pathname.match(/^\/invite\/([a-f0-9-]+)\/?$/i);
+const invitedRoomId = invitePathMatch?.[1] || null;
+const isInviteVisit = Boolean(invitedRoomId);
+
 const elements = {
   dashboard: document.querySelector('#dashboard-view'),
   callView: document.querySelector('#call-view'),
@@ -31,11 +35,17 @@ const elements = {
   localVideo: document.querySelector('#local-video'),
   remoteVideo: document.querySelector('#remote-video'),
   remotePlaceholder: document.querySelector('#remote-placeholder'),
+  videoStage: document.querySelector('#video-stage'),
+  localTile: document.querySelector('#local-tile'),
+  showLocalPreview: document.querySelector('#show-local-preview'),
+  callControls: document.querySelector('#call-controls'),
   toastRegion: document.querySelector('#toast-region'),
 };
 
+if (isInviteVisit) elements.dashboard.hidden = true;
+
 function roomTokenKey(roomId) {
-  return `roomly:token:${roomId}`;
+  return `roomlik:token:${roomId}`;
 }
 
 function getToken(roomId) {
@@ -154,9 +164,14 @@ function renderRooms() {
 
 async function loadRooms({ quiet = false } = {}) {
   try {
-    const data = await api('/api/rooms');
-    state.rooms = data.rooms;
-    renderRooms();
+    if (isInviteVisit) {
+      const data = await api(`/api/rooms/${invitedRoomId}`);
+      state.rooms = [data.room];
+    } else {
+      const data = await api('/api/rooms');
+      state.rooms = data.rooms;
+      renderRooms();
+    }
     handleInviteLink();
   } catch (error) {
     if (!quiet) showToast(error.message, 'error');
@@ -168,7 +183,7 @@ function findRoom(roomId) {
 }
 
 function inviteUrl(roomId) {
-  return `${window.location.origin}${window.location.pathname}#room/${roomId}`;
+  return `${window.location.origin}/invite/${roomId}`;
 }
 
 async function copyInvite(roomId) {
@@ -235,15 +250,133 @@ function openDeleteDialog(room) {
 
 function closeDialog(dialog) {
   if (dialog.open) dialog.close();
+  if (isInviteVisit && dialog === elements.accessDialog && !state.currentRoom) {
+    window.location.replace('/');
+  }
+}
+
+const OVERLAY_MARGIN = 8;
+
+function clamp(value, minimum, maximum) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function getOverlayPosition(element) {
+  const stageRect = elements.videoStage.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  return {
+    left: elementRect.left - stageRect.left,
+    top: elementRect.top - stageRect.top,
+  };
+}
+
+function placeOverlay(element, left, top) {
+  const maximumLeft = Math.max(OVERLAY_MARGIN, elements.videoStage.clientWidth - element.offsetWidth - OVERLAY_MARGIN);
+  const maximumTop = Math.max(OVERLAY_MARGIN, elements.videoStage.clientHeight - element.offsetHeight - OVERLAY_MARGIN);
+
+  element.style.left = `${clamp(left, OVERLAY_MARGIN, maximumLeft)}px`;
+  element.style.top = `${clamp(top, OVERLAY_MARGIN, maximumTop)}px`;
+  element.style.right = 'auto';
+  element.style.bottom = 'auto';
+  element.style.translate = 'none';
+  element.dataset.moved = 'true';
+}
+
+function clampMovedOverlay(element) {
+  if (element.hidden || element.dataset.moved !== 'true') return;
+  const position = getOverlayPosition(element);
+  placeOverlay(element, position.left, position.top);
+}
+
+function makeDraggable(element, { pointerHandle = element, keyboardHandle = pointerHandle, ignoreSelector = '' } = {}) {
+  let drag = null;
+
+  pointerHandle.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !state.currentRoom) return;
+    if (ignoreSelector && event.target.closest?.(ignoreSelector)) return;
+
+    const position = getOverlayPosition(element);
+    placeOverlay(element, position.left, position.top);
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: position.left,
+      top: position.top,
+    };
+    element.classList.add('is-dragging');
+    pointerHandle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  pointerHandle.addEventListener('pointermove', (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    placeOverlay(
+      element,
+      drag.left + event.clientX - drag.startX,
+      drag.top + event.clientY - drag.startY,
+    );
+  });
+
+  const finishDrag = (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    element.classList.remove('is-dragging');
+    if (pointerHandle.hasPointerCapture(event.pointerId)) pointerHandle.releasePointerCapture(event.pointerId);
+  };
+
+  pointerHandle.addEventListener('pointerup', finishDrag);
+  pointerHandle.addEventListener('pointercancel', finishDrag);
+
+  keyboardHandle.addEventListener('keydown', (event) => {
+    const directions = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const direction = directions[event.key];
+    if (!direction || !state.currentRoom) return;
+
+    const position = getOverlayPosition(element);
+    const distance = event.shiftKey ? 30 : 10;
+    placeOverlay(
+      element,
+      position.left + direction[0] * distance,
+      position.top + direction[1] * distance,
+    );
+    event.preventDefault();
+  });
+}
+
+function resetCallOverlays() {
+  [elements.localTile, elements.callControls].forEach((element) => {
+    element.style.removeProperty('left');
+    element.style.removeProperty('top');
+    element.style.removeProperty('right');
+    element.style.removeProperty('bottom');
+    element.style.removeProperty('translate');
+    element.classList.remove('is-dragging');
+    delete element.dataset.moved;
+  });
+
+  elements.localTile.hidden = false;
+  elements.showLocalPreview.hidden = true;
+  elements.callControls.classList.remove('is-collapsed');
+  const collapseButton = document.querySelector('#collapse-toolbar');
+  collapseButton.setAttribute('aria-expanded', 'true');
+  collapseButton.setAttribute('aria-label', 'Collapse toolbar');
+  collapseButton.dataset.tooltip = 'Collapse';
 }
 
 function handleInviteLink() {
   if (state.inviteHandled) return;
-  const match = window.location.hash.match(/^#room\/([a-f0-9-]+)$/i);
-  if (!match) return;
+  const legacyMatch = window.location.hash.match(/^#room\/([a-f0-9-]+)$/i);
+  const roomId = invitedRoomId || legacyMatch?.[1];
+  if (!roomId) return;
 
   state.inviteHandled = true;
-  const room = findRoom(match[1]);
+  const room = findRoom(roomId);
   if (!room) {
     window.history.replaceState({}, '', window.location.pathname);
     showToast('That invite link points to a room that no longer exists.', 'error');
@@ -293,7 +426,7 @@ elements.accessForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({ password }),
     });
     saveToken(roomId, data.token);
-    closeDialog(elements.accessDialog);
+    elements.accessDialog.close();
     const room = { ...data.room };
     const index = state.rooms.findIndex((candidate) => candidate.id === roomId);
     if (index >= 0) state.rooms[index] = room;
@@ -413,6 +546,11 @@ document.querySelectorAll('dialog').forEach((dialog) => {
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) closeDialog(dialog);
   });
+  dialog.addEventListener('cancel', () => {
+    if (isInviteVisit && dialog === elements.accessDialog && !state.currentRoom) {
+      window.setTimeout(() => window.location.replace('/'), 0);
+    }
+  });
 });
 
 async function openCall(room, token) {
@@ -420,12 +558,13 @@ async function openCall(room, token) {
   state.queuedCandidates = [];
   elements.dashboard.hidden = true;
   elements.callView.hidden = false;
+  resetCallOverlays();
   document.querySelector('#call-room-name').textContent = room.name;
   document.querySelector('#call-status').textContent = 'Preparing your camera…';
   document.querySelector('#participant-count').textContent = '1 / 2';
   elements.remotePlaceholder.hidden = false;
   elements.remoteVideo.srcObject = null;
-  window.location.hash = `room/${room.id}`;
+  if (!isInviteVisit) window.location.hash = `room/${room.id}`;
 
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -585,12 +724,17 @@ function leaveCall({ updateHash = true } = {}) {
   window.clearInterval(state.timer);
   state.timer = null;
   state.currentRoom = null;
+  resetCallOverlays();
   elements.callView.hidden = true;
   elements.dashboard.hidden = false;
   document.querySelector('#toggle-mic').classList.remove('is-off');
   document.querySelector('#toggle-camera').classList.remove('is-off');
   document.querySelector('#local-camera-off').hidden = true;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (isInviteVisit) {
+    window.location.replace('/');
+    return;
+  }
   if (updateHash) window.history.replaceState({}, '', window.location.pathname);
   state.inviteHandled = true;
   loadRooms({ quiet: true });
@@ -615,6 +759,50 @@ document.querySelector('#toggle-camera').addEventListener('click', (event) => {
   document.querySelector('#local-camera-off').hidden = track.enabled;
 });
 
+document.querySelector('#hide-local-preview').addEventListener('click', () => {
+  elements.localTile.hidden = true;
+  elements.showLocalPreview.hidden = false;
+  elements.showLocalPreview.focus();
+});
+
+elements.showLocalPreview.addEventListener('click', () => {
+  elements.showLocalPreview.hidden = true;
+  elements.localTile.hidden = false;
+  window.requestAnimationFrame(() => {
+    clampMovedOverlay(elements.localTile);
+    document.querySelector('#hide-local-preview').focus();
+  });
+});
+
+document.querySelector('#collapse-toolbar').addEventListener('click', (event) => {
+  const collapsed = elements.callControls.classList.toggle('is-collapsed');
+  event.currentTarget.setAttribute('aria-expanded', String(!collapsed));
+  event.currentTarget.setAttribute('aria-label', collapsed ? 'Expand toolbar' : 'Collapse toolbar');
+  event.currentTarget.dataset.tooltip = collapsed ? 'Expand' : 'Collapse';
+  window.requestAnimationFrame(() => clampMovedOverlay(elements.callControls));
+});
+
+makeDraggable(elements.localTile, {
+  pointerHandle: elements.localTile,
+  keyboardHandle: document.querySelector('#local-drag-handle'),
+  ignoreSelector: '[data-no-drag]',
+});
+makeDraggable(elements.callControls, {
+  pointerHandle: document.querySelector('#toolbar-drag-handle'),
+});
+
+let resizeFrame;
+function keepOverlaysInView() {
+  window.cancelAnimationFrame(resizeFrame);
+  resizeFrame = window.requestAnimationFrame(() => {
+    clampMovedOverlay(elements.localTile);
+    clampMovedOverlay(elements.callControls);
+  });
+}
+
+window.addEventListener('resize', keepOverlaysInView);
+document.addEventListener('fullscreenchange', keepOverlaysInView);
+
 document.querySelector('#leave-call').addEventListener('click', () => leaveCall({ updateHash: true }));
 document.querySelector('#copy-call-link').addEventListener('click', () => state.currentRoom && copyInvite(state.currentRoom.id));
 document.querySelector('#copy-waiting-link').addEventListener('click', () => state.currentRoom && copyInvite(state.currentRoom.id));
@@ -630,5 +818,5 @@ window.addEventListener('beforeunload', () => {
 
 loadRooms();
 window.setInterval(() => {
-  if (!elements.dashboard.hidden && document.visibilityState === 'visible') loadRooms({ quiet: true });
+  if (!isInviteVisit && !elements.dashboard.hidden && document.visibilityState === 'visible') loadRooms({ quiet: true });
 }, 15_000);

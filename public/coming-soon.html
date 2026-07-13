@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f4f2ec">
+  <title>Coming soon</title>
+  <link rel="stylesheet" href="/coming-soon.css">
+</head>
+<body>
+  <main>
+    <button id="preview-trigger" class="coming-soon" type="button">Coming soon</button>
+  </main>
+
+  <dialog id="password-dialog" aria-labelledby="password-title">
+    <form id="password-form" method="dialog" novalidate>
+      <button id="close-dialog" class="close" type="button" aria-label="Close">×</button>
+      <h1 id="password-title">Password</h1>
+      <input id="admin-password" type="password" autocomplete="current-password" aria-label="Password" required autofocus>
+      <p id="password-error" role="alert"></p>
+      <button id="submit-password" class="enter" type="submit">Enter</button>
+    </form>
+  </dialog>
+
+  <script src="/coming-soon.js"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { randomBytes } = require('node:crypto');
+const { createHash, randomBytes, timingSafeEqual } = require('node:crypto');
 const http = require('node:http');
 const express = require('express');
 const helmet = require('helmet');
@@ -12,9 +12,40 @@ const NAME_LIMIT = 60;
 const DESCRIPTION_LIMIT = 180;
 const PASSWORD_MIN = 4;
 const PASSWORD_MAX = 72;
+const ADMIN_COOKIE = 'roomlik_preview';
+const INVITE_COOKIE = 'roomlik_invite';
+const ADMIN_TOKEN_ID = '__roomlik_preview_admin__';
+const ADMIN_SESSION_SECONDS = 7 * 24 * 60 * 60;
+const INVITE_SESSION_SECONDS = 2 * 60 * 60;
+const MAX_ADMIN_ATTEMPTS = 5;
+const ADMIN_LOCKOUT_MS = 10 * 60 * 1000;
 
 function cleanString(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseCookies(request) {
+  return (request.get('cookie') || '').split(';').reduce((cookies, part) => {
+    const separator = part.indexOf('=');
+    if (separator === -1) return cookies;
+
+    const name = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (name) {
+      try {
+        cookies[name] = decodeURIComponent(value);
+      } catch {
+        cookies[name] = value;
+      }
+    }
+    return cookies;
+  }, {});
+}
+
+function passwordsMatch(received, expected) {
+  const receivedHash = createHash('sha256').update(received).digest();
+  const expectedHash = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(receivedHash, expectedHash);
 }
 
 function validateRoomInput(body, partial = false) {
@@ -50,7 +81,10 @@ function validateRoomInput(body, partial = false) {
 function createApplication(options = {}) {
   const dataFile = options.dataFile || path.join(__dirname, '..', 'data', 'rooms.json');
   const tokenSecret = options.tokenSecret || process.env.TOKEN_SECRET || randomBytes(32).toString('hex');
+  const adminPassword = options.adminPassword || process.env.ADMIN_PASSWORD || 'change-me-admin-password';
+  const secureCookies = options.secureCookies ?? process.env.NODE_ENV === 'production';
   const publicDirectory = path.join(__dirname, '..', 'public');
+  const adminAttempts = new Map();
   const store = new RoomStore(dataFile);
   const app = express();
   const httpServer = http.createServer(app);
@@ -60,6 +94,7 @@ function createApplication(options = {}) {
   });
 
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -76,12 +111,38 @@ function createApplication(options = {}) {
   }));
   app.use(express.json({ limit: '20kb' }));
 
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+
   function participantCount(roomId) {
     return io.sockets.adapter.rooms.get(roomId)?.size || 0;
   }
 
   function issueToken(roomId) {
     return signRoomToken(roomId, tokenSecret);
+  }
+
+  function adminIsAuthenticated(req) {
+    const token = parseCookies(req)[ADMIN_COOKIE];
+    const payload = verifyRoomToken(token, tokenSecret);
+    return payload?.roomId === ADMIN_TOKEN_ID;
+  }
+
+  function inviteIsAuthenticated(req) {
+    const token = parseCookies(req)[INVITE_COOKIE];
+    const payload = verifyRoomToken(token, tokenSecret);
+    return Boolean(payload?.roomId && store.get(payload.roomId));
+  }
+
+  function requireAdmin(req, res, next) {
+    if (adminIsAuthenticated(req)) return next();
+    return res.status(401).json({ error: 'Preview access is required.' });
+  }
+
+  function requireApplicationAsset(req, res, next) {
+    if (adminIsAuthenticated(req) || inviteIsAuthenticated(req)) return next();
+    return res.status(404).end();
   }
 
   function authenticateRoom(req, res, next) {
@@ -97,7 +158,37 @@ function createApplication(options = {}) {
     return next();
   }
 
-  app.get('/api/rooms', (req, res) => {
+  app.post('/api/admin/access', (req, res) => {
+    const address = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const attempt = adminAttempts.get(address);
+
+    if (attempt?.blockedUntil > now) {
+      return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
+    }
+
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!passwordsMatch(password, adminPassword)) {
+      const failures = (attempt?.failures || 0) + 1;
+      adminAttempts.set(address, {
+        failures,
+        blockedUntil: failures >= MAX_ADMIN_ATTEMPTS ? now + ADMIN_LOCKOUT_MS : 0,
+      });
+      return res.status(401).json({ error: 'Incorrect password.' });
+    }
+
+    adminAttempts.delete(address);
+    res.cookie(ADMIN_COOKIE, signRoomToken(ADMIN_TOKEN_ID, tokenSecret, ADMIN_SESSION_SECONDS), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: secureCookies,
+      maxAge: ADMIN_SESSION_SECONDS * 1000,
+      path: '/',
+    });
+    return res.status(204).end();
+  });
+
+  app.get('/api/rooms', requireAdmin, (req, res) => {
     const rooms = store.list().map((room) => ({
       ...room,
       participants: participantCount(room.id),
@@ -116,7 +207,7 @@ function createApplication(options = {}) {
     });
   });
 
-  app.post('/api/rooms', async (req, res, next) => {
+  app.post('/api/rooms', requireAdmin, async (req, res, next) => {
     try {
       const validation = validateRoomInput(req.body || {});
       if (!validation.valid) return res.status(400).json({ error: 'Check the highlighted fields.', fields: validation.errors });
@@ -219,10 +310,49 @@ function createApplication(options = {}) {
     });
   });
 
-  app.use(express.static(publicDirectory, { extensions: ['html'] }));
+  app.get('/coming-soon.css', (req, res) => {
+    return res.sendFile(path.join(publicDirectory, 'coming-soon.css'));
+  });
+
+  app.get('/coming-soon.js', (req, res) => {
+    return res.sendFile(path.join(publicDirectory, 'coming-soon.js'));
+  });
+
+  app.get('/styles.css', requireApplicationAsset, (req, res) => {
+    return res.sendFile(path.join(publicDirectory, 'styles.css'));
+  });
+
+  app.get('/app.js', requireApplicationAsset, (req, res) => {
+    return res.sendFile(path.join(publicDirectory, 'app.js'));
+  });
+
+  app.get('/invite/:id', (req, res) => {
+    const room = store.get(req.params.id);
+    if (!room) {
+      res.status(404);
+      return res.sendFile(path.join(publicDirectory, 'coming-soon.html'));
+    }
+
+    res.cookie(INVITE_COOKIE, signRoomToken(room.id, tokenSecret, INVITE_SESSION_SECONDS), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: secureCookies,
+      maxAge: INVITE_SESSION_SECONDS * 1000,
+      path: '/',
+    });
+    res.set('Cache-Control', 'no-store');
+    return res.sendFile(path.join(publicDirectory, 'index.html'));
+  });
+
+  app.get('/', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const page = adminIsAuthenticated(req) ? 'index.html' : 'coming-soon.html';
+    return res.sendFile(path.join(publicDirectory, page));
+  });
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
-    return res.sendFile(path.join(publicDirectory, 'index.html'));
+    return res.redirect('/');
   });
 
   app.use((req, res) => {
